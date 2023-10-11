@@ -1,0 +1,364 @@
+Some requirements: 
+    1, two hidden layer (input -> hidden1 -> hidden2 -> out)
+    2, fix nn architecture
+    3, initialize in anyway 
+    4, output layer has 3 outputs (no softmax)
+    5, All hidden and output layers have sigmoid activation functions 
+    6, Batch size is 1 
+    7, The loss function is the sum of squared errors(SSE)
+        -> SSE across the 3 outputs 
+        -> use the mean SSE across all samples (samples is the features) to measure your model's performence (epoch)
+'''
+#%%i
+import numpy as np
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
+import csv as csv
+
+#%%
+start = time.time()
+
+# Training Data
+x_train = pd.read_csv('data/training_set.csv',header=None).values
+y_train = pd.read_csv('data/training_labels_bin.csv', header=None).values
+x_val = pd.read_csv('data/validation_set.csv', header=None).values
+y_val = pd.read_csv('data/validation_labels_bin.csv', header=None).values
+N = len(x_train)
+M = len(x_val)
+
+num_feats = x_train.shape[1]
+n_out = y_train.shape[1]
+
+
+#%%
+'''
+def sigmoid(Z):
+    return 1/(1+np.exp(-Z))
+# (dL/dA)*(dA/dZ)
+def sigmoid_backward(dA, Z):
+    sig = sigmoid(Z)
+    return dA * sig * (1 - sig)
+Z = np.array([1,1,1,1,1,1,1])
+dA = np.array ([1 ,1 ,1 ,1 ,1 ,1, 1])
+sig = sigmoid(Z)
+backsig = sigmoid_backward(dA, Z)
+'''
+    
+#%%
+# hyperparameters (you may change these)
+eta = 0.001 # intial learning rate
+gamma = 0.00001 # multiplier for the learning rate
+stepsize = 200 # epochs before changing learning rate
+threshold = 0.0001 # stopping criterion
+test_interval = 10 # number of epoch before validating
+max_epoch = 500
+
+# Define Architecture of NN
+'''
+Here we use dictionary to store the archechture of the neural network:
+    {"input_dimension": , "output_dimension": , "activation_func": }
+'''
+nn_arch = [
+        {"input_dimension": 354, "output_dimension":10, "activation_func":"sigmoid"},
+        {"input_dimension": 10, "output_dimension":10, "activation_func":"sigmoid"},
+        {"input_dimension": 10, "output_dimension":3, "activation_func":"sigmoid"},
+]
+
+# Intialize your network weights and biases here
+def _init_(nn_arch,seed=99):
+    '''
+    Initialize neural network
+    Here we initalized the parameters of the neural network: 
+        input:      nn_arch             dictionary 
+                    seed                int
+        output:     parameters_values   dictionary
+                       -> W               (output_size * input_size)          matrix 
+                       -> b               (output_size * 1)                   column vector
+    '''
+    np.random.seed(seed)
+    num_of_layers = len(nn_arch)
+    parameters_values = {}
+    # creates random sets of weights and bias layer by layer
+    for i, layer in enumerate(nn_arch):
+        layer_i = i + 1
+        layer_input_size = layer['input_dimension']
+        layer_output_size = layer ['output_dimension']
+        
+        parameters_values['W' + str(layer_i)] = np.random.randn(layer_output_size, layer_input_size)
+        parameters_values['b' + str(layer_i)] = np.random.randn(layer_output_size, 1)
+    return parameters_values
+
+
+#Sigmoid Activation Function for feedforward
+def sigmoid(Z):
+    '''
+    Sigmoid activation function
+    Z:  output * 1
+    after sigmoid: output * 1 
+    '''
+    return 1/(1+np.exp(-Z))
+
+
+#Sigmoid Activation Function for backprop
+def sigmoid_backward(dA, Z):
+    '''
+    Backward sigmoid activation function
+    input:      Z           array(output * 1)
+                W           array(output * 1)
+    output:     backsig     array(output * 1)
+    '''
+    sig = sigmoid(Z)
+    return dA * sig * (1 - sig)
+
+
+def multi_layer_forword_propagation (nn_arch, parameters_values, input_value):
+    '''
+    Preforms 1-way forward propagation
+    input:      nn_arch                         dictionary 
+                parameters_values               dictionary
+                input_values                    array
+    output:     node_values                     dictionary
+                    -> node_act: nodes after the activiation (here we consider the "node_act0" is 
+                                                              the input and "node_act3" is the output)
+                    -> node: nodes before the activiation
+    '''
+    # store node values
+    node_values = {}
+    # go through each layer
+    for i, layer_arch in enumerate(nn_arch):
+        layer_index = (int)(i + 1)
+        # input layer starts with input values
+        if layer_index == 1:
+            node_curr = np.dot(parameters_values['W'+ str(layer_index)],input_value)+parameters_values['b'+ str(layer_index)] # linear combination
+            node_curr_act = sigmoid(node_curr) # non-linear activation
+            # update
+            node_prev = node_curr
+            node_prev_act = node_curr_act 
+            node_values['node_act'+str(i)] = input_value
+            node_values['node'+str(layer_index)] = node_curr
+            node_values['node_act'+str(layer_index)] = node_curr_act
+        # other layers take from previous layer
+        else:
+            node_curr = np.dot(parameters_values['W'+ str(layer_index)],node_prev_act)+parameters_values['b'+ str(layer_index)] # linear combination
+            node_curr_act = sigmoid(node_curr) # non-linear activation
+            # update
+            node_prev = node_curr
+            node_prev_act = node_curr_act
+            node_values['node'+str(layer_index)] = node_curr
+            node_values['node_act'+str(layer_index)] = node_curr_act
+    node_last_act = node_curr_act
+    return node_last_act, node_values
+
+# the cost function is implemented as the squared error 
+def cost_function (Y_pred, Y):
+    '''
+    Calcuates the cost function (squared error)
+    input:      Y_pred:                 array
+                Y:                      array 
+    output:     squared_error_mean      array(output*1)
+    '''
+    squared_error = np.square(Y-Y_pred) # square error calculation
+    return squared_error
+
+#%%
+
+def single_layer_backward_propagation(dA_curr, W_curr, b_curr, Z_curr, A_prev):
+    '''
+    Finds the values needed for backprop of a single layer
+    input:                  dA_curr                 array(output_curr * 1)
+                            W_curr                  array(output_curr * input_curr)
+                            b_curr                  array(output_curr * 1)
+                            z_curr                  array(output_curr * 1)
+                            A_prev                  array(input_curr * 1)
+    output:                 dA_prev                 array(input_curr * 1)
+                            dW_curr                 array(output * input)
+                            db_curr                 array(output * 1)
+    '''
+    # calculate all needed parital derivative 
+    dZ_curr = sigmoid_backward(dA_curr, Z_curr) #output_curr * 1 
+    dW_curr = np.dot(dZ_curr, A_prev.T) 
+    db_curr = dZ_curr
+    dA_prev = np.dot(W_curr.T, dZ_curr)
+
+    return dA_prev, dW_curr, db_curr
+
+def full_backward_propagation(Y_hat, Y, node_values, parameters_values, nn_arch):
+    '''
+    Finds the values needed for backprop for whole network
+    input:                  Y_hat                       array(output_last * 1)
+                            Y                           array(output_last * 1)
+                            node_values                 dictionary
+                            parameters_values           dictionary
+                            nn_arch                     dictionary
+    output:                 dA_prev                     dictionary
+    '''
+    grads_values = {} # store gradient values
+    m = Y.shape[1]
+    Y = Y.reshape(Y_hat.shape) # assert that Y_hat and Y has the same shape
+    dA_prev = -2 * (Y - Y_hat); # derivative of the cost function
+
+    # enumerate starts with the output layer
+    # this uses a reversed layer idx: 2, 1, 0
+    for layer_idx_prev, layer in reversed(list(enumerate(nn_arch))):
+        # layer_idx_curr: 3, 2, 1
+        layer_idx_curr = layer_idx_prev + 1
+        
+        dA_curr = dA_prev # move backwards 
+        
+        # sets the last activation value
+        A_prev = node_values["node_act" + str(layer_idx_prev)]
+        # sets the current linear combination input
+        Z_curr = node_values["node" + str(layer_idx_curr)]
+        # current weights and biases
+        W_curr = parameters_values["W" + str(layer_idx_curr)]
+        b_curr = parameters_values["b" + str(layer_idx_curr)]
+        
+        # calcualtes gradient values of current layer
+        dA_prev, dW_curr, db_curr = single_layer_backward_propagation(
+            dA_curr, W_curr, b_curr, Z_curr, A_prev)
+        # add gradient values
+        grads_values["dW" + str(layer_idx_curr)] = dW_curr
+        grads_values["db" + str(layer_idx_curr)] = db_curr
+
+    return grads_values
+
+def update(parameters_values, grads_values, nn_arch, learning_rate):
+    '''
+    Updates all weights and biases
+    input:                  parameters_values                     dictionary
+                            grads_values                          dictionary
+                            nn_arch                               dictionary
+                            learning_rate                         float
+    output:                 parameters_values                     dictionary
+    '''
+    for idx, layer in enumerate(nn_arch):
+        layer_idx = idx + 1
+        parameters_values["W" + str(layer_idx)] -= learning_rate * grads_values["dW" + str(layer_idx)]
+        parameters_values["b" + str(layer_idx)] -= learning_rate * grads_values["db" + str(layer_idx)]
+
+    return parameters_values;
+    
+#%%
+
+#Save for plots
+train_total_1 = []
+train_total_2 = []
+train_total_3 = []
+val_total_1 = []
+val_total_2 = []
+val_total_3 = []
+
+# start training 
+params_values = _init_(nn_arch, 2)    
+for epoch in range(max_epoch):
+    order = np.random.permutation(N) # shuffle data
+    cost_history = []
+    sse = 0
+    squared_error = 0
+
+    for n in range(0, N):
+        idx = order[n]
+
+        # get a sample (batch size=1)
+        X_in = np.array(x_train[idx]).reshape((num_feats, 1))
+        Y = np.array(y_train[idx]).reshape((n_out, 1))
+
+        # forward pass
+        # save the output of each layer to calculate the gradients later
+        Y_hat, cashe = multi_layer_forword_propagation(nn_arch, params_values,  X_in)
+        sse = cost_function(Y_hat, Y)
+        
+    
+        # compute error and gradients
+        grads_values = full_backward_propagation(Y_hat, Y, cashe, params_values, nn_arch)               
+
+        # update weights and biases
+        params_values = update(params_values, grads_values, nn_arch, eta)
+        sse += squared_error
+        
+        
+    # report training preformance  
+    train_mse = sse/len(x_train)
+    cost_history.append(train_mse)
+    train_total_1.append(train_mse[0])
+    train_total_2.append(train_mse[1])
+    train_total_3.append(train_mse[2])
+    print("epoch:" + str(epoch) + "; "+"training cost:" + str(train_mse))
+    
+    if epoch % test_interval == 0: 
+        # test on validation set
+        print("---------------------validation-----------------------")
+        Val_squared_error = 0
+        for v in range (0,M):
+            valid_idx = v
+            
+            X_val_in = np.array(x_val[valid_idx]).reshape((num_feats, 1))
+            Y_val_in = np.array(y_val[valid_idx]).reshape((n_out, 1))
+            
+            Y_val_hat, cashe = multi_layer_forword_propagation(nn_arch, params_values,  X_val_in)
+            val_sse = cost_function(Y_val_hat, Y)
+            val_sse += Val_squared_error
+        val_mse = val_sse/len(x_val)
+        val_total_1.append(val_mse[0])
+        val_total_2.append(val_mse[1])
+        val_total_3.append(val_mse[2])
+        # report validation preformance 
+        print("epoch:" + str(epoch) + "; "+"validation cost:" + str(val_mse))
+        print("---------------------validation end-----------------------")
+        # if termination condition is satisfied, exit
+        if np.all(val_mse < threshold):
+            print("break")
+            break
+    # updates learning rate every 200 epoch
+    if epoch % stepsize == 0 and epoch != 0:
+        eta = eta*gamma
+        print('Changed learning rate to lr=' + str(eta))
+   
+        
+# variables for error plotting
+train_total_1 = np.concatenate(train_total_1, axis=0)
+train_total_2 = np.concatenate(train_total_2, axis=0)
+train_total_3 = np.concatenate(train_total_3, axis=0)
+
+val_total_1 = np.concatenate(val_total_1, axis=0)
+val_total_2 = np.concatenate(val_total_2, axis=0)
+val_total_3 = np.concatenate(val_total_3, axis=0)
+
+# errors on each output seperately
+fig, ax = plt.subplots()
+ax.plot(range(len(train_total_1)), train_total_1,)
+ax.plot(range(len(train_total_1)), train_total_2)
+ax.plot(range(len(train_total_1)), train_total_3)
+plt.xlabel('Epoch')
+plt.ylim(0, 0.0002)
+plt.ylabel('Square Error')
+plt.title('Training Error (each vector value)')
+plt.show()
+
+fig, ax = plt.subplots()
+ax.plot(range(len(val_total_1)), val_total_1)
+ax.plot(range(len(val_total_1)), val_total_2)
+ax.plot(range(len(val_total_1)), val_total_3)
+plt.xlabel('Test Interval Epoch')
+plt.ylim(0, 0.002)
+plt.ylabel('Square Error')
+plt.title('Test Error (each vector value)')
+plt.show()
+
+# errors for the sum of outputs
+fig, ax = plt.subplots()
+ax.plot(range(len(train_total_1)), (train_total_1+train_total_2+train_total_3))
+plt.xlabel('Epoch')
+plt.ylim(0, 0.00035)
+plt.ylabel('Square Error')
+plt.title('Training Error')
+plt.show()
+
+fig, ax = plt.subplots()
+ax.plot(range(len(val_total_1)), (val_total_1+val_total_2+val_total_3))
+plt.xlabel('Test Interval Epoch')
+plt.ylim(0, 0.004)
+plt.ylabel('Square Error')
+plt.title('Test Error')
+plt.show()
