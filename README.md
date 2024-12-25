@@ -87,13 +87,13 @@ Overview
 
 Project Structure
 
-.
-├── data/
-│   ├── training_labels_bin.csv
-│   └── validation_labels_bin.csv
-├── mlp_model.py
-├── train_mlp.py
-└── README.md
+    .
+    ├── data/
+    │   ├── training_labels_bin.csv
+    │   └── validation_labels_bin.csv
+    ├── mlp_model.py
+    ├── train_mlp.py
+    └── README.md
 
     data/: Contains the CSV files for:
         Training set (training_set.csv)
