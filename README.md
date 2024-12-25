@@ -1,6 +1,6 @@
 MLP with Backpropagation (NumPy Only)
 
-```mermaid
+<pre> <code>```mermaid
 flowchart LR
     subgraph Input Layer
         x1((x₁))
@@ -68,7 +68,7 @@ flowchart LR
 
     h6 --> y1
     h6 --> y2
-    h6 --> y3
+    h6 --> y3 ```</code> </pre>
 
 This project is a minimal implementation of a Multi-Layer Perceptron (MLP) using only Python and NumPy. It demonstrates how to build a neural network from scratch, including initialization, forward propagation, backpropagation, and weight updates.
 Overview
