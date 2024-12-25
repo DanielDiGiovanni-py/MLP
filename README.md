@@ -1,4 +1,6 @@
-MLP with Backpropagation (NumPy Only)
+<div align="center">
+<h2>MLP with Backpropagation (NumPy Only)</h2>
+</div>
 
 ```mermaid
 %%{ init: { 'flowchart': { 'curve': 'linear' }}}%%
@@ -141,12 +143,12 @@ Usage
 
     python train_mlp.py
 
-        The script will:
-            Load the training and validation sets.
-            Initialize the MLP parameters randomly.
-            Train the MLP via backpropagation.
-            Print epoch-wise SSE metrics.
-            Plot error curves.
+    The script will:
+        Load the training and validation sets.
+        Initialize the MLP parameters randomly.
+        Train the MLP via backpropagation.
+        Print epoch-wise SSE metrics.
+        Plot error curves.
 
     Check the Output:
         The script will display plots of the training and validation errors for each output dimension and for the sum of outputs.
@@ -188,9 +190,5 @@ Contributing
 
     Feel free to fork this project, create issues, and open pull requests.
     For major changes, please discuss in an issue first.
-
-License
-
-Include the license that applies to your project (e.g., MIT, Apache, or any institutional policy).
 
 Happy Training!
