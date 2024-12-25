@@ -68,7 +68,8 @@ flowchart LR
 
     h6 --> y1
     h6 --> y2
-    h6 --> y3 ```
+    h6 --> y3
+```
 
 This project is a minimal implementation of a Multi-Layer Perceptron (MLP) using only Python and NumPy. It demonstrates how to build a neural network from scratch, including initialization, forward propagation, backpropagation, and weight updates.
 Overview
