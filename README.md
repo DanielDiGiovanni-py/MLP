@@ -1,6 +1,6 @@
 MLP with Backpropagation (NumPy Only)
 
-<pre> <code>```mermaid
+```mermaid
 flowchart LR
     subgraph Input Layer
         x1((x₁))
